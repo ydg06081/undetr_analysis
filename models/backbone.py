@@ -58,7 +58,7 @@ class FrozenBatchNorm2d(torch.nn.Module):
 
 class BackboneBase(nn.Module):
 
-    def __init__(self, backbone: nn.Module, train_backbone: bool, return_interm_layers: bool):
+    def __init__(self, backbone: nn.Module, train_backbone: bool, return_interm_layers: bool): #return_interm_layers: 중간 레이어 반환
         super().__init__()
         for name, parameter in backbone.named_parameters():
             if not train_backbone or 'layer2' not in name and 'layer3' not in name and 'layer4' not in name:
@@ -75,13 +75,13 @@ class BackboneBase(nn.Module):
         self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
 
     def forward(self, tensor_list: NestedTensor):
-        xs = self.body(tensor_list.tensors)
-        out: Dict[str, NestedTensor] = {}
+        xs = self.body(tensor_list.tensors) #xs는 backbone의 출력값
+        out: Dict[str, NestedTensor] = {} #out은 
         for name, x in xs.items():
             m = tensor_list.mask
             assert m is not None
             mask = F.interpolate(m[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
-            out[name] = NestedTensor(x, mask)
+            out[name] = NestedTensor(x, mask) #여기  mask한번 확인인
         return out
 
 
@@ -91,24 +91,24 @@ class Backbone(BackboneBase):
                  train_backbone: bool,
                  return_interm_layers: bool,
                  dilation: bool):
-        norm_layer = FrozenBatchNorm2d
+        norm_layer = FrozenBatchNorm2d #backbone shape확인하기기
         backbone = getattr(torchvision.models, name)(
-            replace_stride_with_dilation=[False, False, dilation],
+            replace_stride_with_dilation=[False, False, dilation], #?
             pretrained=is_main_process(), norm_layer=norm_layer)
-        assert name not in ('resnet18', 'resnet34'), "number of channels are hard coded"
-        super().__init__(backbone, train_backbone, return_interm_layers)
+        assert name not in ('resnet18', 'resnet34'), "number of channels are hard coded" #resnet50
+        super().__init__(backbone, train_backbone, return_interm_layers) #backbone의 출력값을 받아옴
         if dilation:
             self.strides[-1] = self.strides[-1] // 2
 
 
-class Joiner(nn.Sequential):
+class Joiner(nn.Sequential): #nn.Sequential: 여러레이어를 쌓아 모델로 만듬.순서대로 정의하고,데이터를 순차적으로 전달하여 출력결과.
     def __init__(self, backbone, position_embedding):
         super().__init__(backbone, position_embedding)
         self.strides = backbone.strides
         self.num_channels = backbone.num_channels
 
     def forward(self, tensor_list: NestedTensor):
-        xs = self[0](tensor_list)
+        xs = self[0](tensor_list) #self[0] = backbone실행행
         out: List[NestedTensor] = []
         pos = []
         for name, x in sorted(xs.items()):
@@ -118,13 +118,13 @@ class Joiner(nn.Sequential):
         for x in out:
             pos.append(self[1](x).to(x.tensors.dtype))
 
-        return out, pos
+        return out, pos #모델로 만드는 과정
 
 
-def build_backbone(args):
+def build_backbone(args): #arg.backbone, arg.lr_backbone, arg.masks, arg.num_feature_levels, arg.dilation
     position_embedding = build_position_encoding(args)
     train_backbone = args.lr_backbone > 0
     return_interm_layers = args.masks or (args.num_feature_levels > 1)
-    backbone = Backbone(args.backbone, train_backbone, return_interm_layers, args.dilation)
+    backbone = Backbone(args.backbone, train_backbone, return_interm_layers, args.dilation) #dilation = padding
     model = Joiner(backbone, position_embedding)
     return model

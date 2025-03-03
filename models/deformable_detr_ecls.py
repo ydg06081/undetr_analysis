@@ -696,13 +696,12 @@ class MLP(nn.Module):
 
 def build(args):
     num_classes = 21 if args.dataset_file != 'coco' else 21
-  
+  # class개수를 21로 고정
     if args.dataset_file == "coco_panoptic":
         num_classes = 250
     device = torch.device(args.device)
 
-    backbone = build_backbone(args)
-
+    backbone = build_backbone(args) #backbone 모델을 반환.#arg.backbone, arg.lr_backbone, arg.masks, arg.num_feature_levels, arg.dilation
     transformer = build_deforamble_transformer(args)
     model = DeformableDETR(
         backbone,

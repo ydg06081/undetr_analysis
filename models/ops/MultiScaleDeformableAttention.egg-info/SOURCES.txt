@@ -1,7 +1,7 @@
 setup.py
-/data/lhm/DETR-like/models/ops/src/vision.cpp
-/data/lhm/DETR-like/models/ops/src/cpu/ms_deform_attn_cpu.cpp
-/data/lhm/DETR-like/models/ops/src/cuda/ms_deform_attn_cuda.cu
+/mnt/c/Users/ydg06/바탕화면/딥러닝모델 구현/UN/UN-DETR/models/ops/src/vision.cpp
+/mnt/c/Users/ydg06/바탕화면/딥러닝모델 구현/UN/UN-DETR/models/ops/src/cpu/ms_deform_attn_cpu.cpp
+/mnt/c/Users/ydg06/바탕화면/딥러닝모델 구현/UN/UN-DETR/models/ops/src/cuda/ms_deform_attn_cuda.cu
 MultiScaleDeformableAttention.egg-info/PKG-INFO
 MultiScaleDeformableAttention.egg-info/SOURCES.txt
 MultiScaleDeformableAttention.egg-info/dependency_links.txt

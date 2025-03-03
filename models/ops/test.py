@@ -6,7 +6,7 @@ import time
 import torch
 import torch.nn as nn
 from torch.autograd import gradcheck
-
+import gc
 from functions.ms_deform_attn_func import MSDeformAttnFunction, ms_deform_attn_core_pytorch
 
 
@@ -76,6 +76,9 @@ if __name__ == '__main__':
 
     for channels in [30, 32, 64, 71, 1025, 2048, 3096]:
         check_gradient_numerical(channels, True, True, True)
+         # GPU 메모리 정리
+        torch.cuda.empty_cache()  # GPU 캐시 메모리 비우기
+        gc.collect()  # Python 가비지 컬렉션 실행
 
 
 

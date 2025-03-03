@@ -162,6 +162,7 @@ class HungarianMatcher_two(nn.Module):
            
             
             # Compute the L1 cost between boxes
+            #여기서 runtime error가 발생함!!!
             cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
 
             # Compute the giou cost betwen boxes
@@ -169,9 +170,9 @@ class HungarianMatcher_two(nn.Module):
                                              box_cxcywh_to_xyxy(tgt_bbox))
 
             # Final cost matrix
-            
+            #GioU + L1 => Box loss
             C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
-
+            #(Box Loss + Class Loss) = L_match
             C = C.view(bs, num_queries, -1).cpu() # [bs, num_queries, num_gt]
        
             
@@ -180,8 +181,8 @@ class HungarianMatcher_two(nn.Module):
             
     
             C_copy = copy.deepcopy(C)
-            C_copy = C_copy.split(sizes, -1)
-            
+            C_copy = C_copy.split(sizes, -1) 
+            #C가 어떻게 이뤄졌길래? [bs, num_queries, num_gt]
             # [bs, [proposal_index, gt_index]]
             indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
             
@@ -189,8 +190,9 @@ class HungarianMatcher_two(nn.Module):
             
             for index_1 in range(len(sizes)):
                 for index_2 in range(len(sizes)):
-                    C_copy[index_1][index_2, indices[index_2][0], :] = 10000 # for match the bigger the worse 
-            
+                    C_copy[index_1][index_2, indices[index_2][0], :] = 10000 
+                    # for match the bigger the worse 아예 다른 값으로 바꾸고 최솟값 구하기
+        
             
             second_indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C_copy)]
             
@@ -202,5 +204,5 @@ class HungarianMatcher_two(nn.Module):
 def build_matcher(args):
     return HungarianMatcher_two(cost_class=args.set_cost_class,
                             cost_bbox=args.set_cost_bbox,
-                            cost_giou=args.set_cost_giou)
+                            cost_giou=args.set_cost_giou) #2,5,2
 

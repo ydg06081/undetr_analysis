@@ -9,14 +9,15 @@ from .torchvision_datasets import CocoDetection as TvCocoDetection
 from util.misc import get_local_rank, get_local_size
 import datasets.transforms as T
 
-
+#이놈은 CocoDetection을 상속받아서 사용한다 
 class CocoDetection(TvCocoDetection):
     def __init__(self, img_folder, ann_file, transforms, return_masks, cache_mode=False, local_rank=0, local_size=1):
         super(CocoDetection, self).__init__(img_folder, ann_file,
                                             cache_mode=cache_mode, local_rank=local_rank, local_size=local_size)
         self._transforms = transforms
         self.prepare = ConvertCocoPolysToMask(return_masks)
-
+#transforms Compose로 구성, 이미지 전처리 => 여러 개의 변환을 리스트로 받아 순서대로 적용합니다.
+#horizontal flip,randomselect (to tensor, normalize)
     def __getitem__(self, idx):
         img, target = super(CocoDetection, self).__getitem__(idx)
         image_id = self.ids[idx]
@@ -110,14 +111,14 @@ class ConvertCocoPolysToMask(object):
 
 
 def make_coco_transforms(image_set):
-
+#이미지 정규화를 위함!
     normalize = T.Compose([
         T.ToTensor(),
         T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
     scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
-
+#학습데이터 셋 변화정의의
     if image_set == 'train':
         return T.Compose([
             T.RandomHorizontalFlip(),
@@ -129,7 +130,7 @@ def make_coco_transforms(image_set):
                     T.RandomResize(scales, max_size=1333),
                 ])
             ),
-            normalize,
+            normalize, #정규화화
         ])
 
     if image_set == 'val':
@@ -138,7 +139,7 @@ def make_coco_transforms(image_set):
             normalize,
         ])
 
-    raise ValueError(f'unknown {image_set}')
+    raise ValueError(f'unknown {image_set}') #알 수 없는 img
 
 
 def build(image_set, args):
@@ -150,7 +151,7 @@ def build(image_set, args):
         "val": (root / "val2017", root / "annotations" / f'{mode}_val2017.json'),
     }
 
-    img_folder, ann_file = PATHS[image_set]
+    img_folder, ann_file = PATHS[image_set] #imgae_set은 train, val인지 정함.
     dataset = CocoDetection(img_folder, ann_file, transforms=make_coco_transforms(image_set), return_masks=args.masks,
                             cache_mode=args.cache_mode, local_rank=get_local_rank(), local_size=get_local_size())
     return dataset

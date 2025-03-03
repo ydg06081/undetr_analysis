@@ -33,7 +33,7 @@ def get_args_parser():
     parser.add_argument('--clip_max_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
 
-
+#각종 인자들 설정해주는것. epoch, batch size, learning rate 등등 bs 3 => 1 epoch 70=> 10 
     parser.add_argument('--sgd', action='store_true')
 
     # Variants of Deformable DETR
@@ -101,7 +101,9 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='coco')
-    parser.add_argument('--coco_path', default='/data/lhm/VOC2COCO', type=str)
+    parser.add_argument('--coco_path', default='/mnt/d/data/COCO', type=str)
+    
+    
     parser.add_argument('--coco_panoptic_path', type=str)
     parser.add_argument('--remove_difficult', action='store_true')
 
@@ -121,6 +123,7 @@ def get_args_parser():
     
     return parser
 
+#parser에 대한 인자들을 추가
 
 def main(args):
     utils.init_distributed_mode(args)
@@ -144,11 +147,13 @@ def main(args):
     model_without_ddp = model
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
-
+#image_set: train, val, test을 build_dataset에 넣어서 dataset을 만든다.
     dataset_train = build_dataset(image_set='train', args=args)
+    
     dataset_val = build_dataset(image_set='val', args=args)
 
     if args.distributed:
+        #ditributed일 경우 여러개의 GPU를 사용하는 것으로 보임.
         if args.cache_mode:
             sampler_train = samplers.NodeDistributedSampler(dataset_train)
             sampler_val = samplers.NodeDistributedSampler(dataset_val, shuffle=False)
@@ -161,10 +166,11 @@ def main(args):
 
     batch_sampler_train = torch.utils.data.BatchSampler(
         sampler_train, args.batch_size, drop_last=True)
-
+#분산환경이 아니라면 그냥 DataLoader에서 shuffle을 True로 설정해주면 됨.
     data_loader_train = DataLoader(dataset_train, batch_sampler=batch_sampler_train,
                                    collate_fn=utils.collate_fn, num_workers=args.num_workers,
                                    pin_memory=True)
+    
     data_loader_val = DataLoader(dataset_val, args.batch_size, sampler=sampler_val,
                                  drop_last=False, collate_fn=utils.collate_fn, num_workers=args.num_workers,
                                  pin_memory=True)
@@ -348,6 +354,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Deformable DETR training and evaluation script', parents=[get_args_parser()])
+    #print(parser.parse_args())
     args = parser.parse_args()
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)

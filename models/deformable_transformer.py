@@ -24,7 +24,9 @@ class DeformableTransformer(nn.Module):
         self.nhead = nhead
         self.two_stage = two_stage
         self.two_stage_num_proposals = two_stage_num_proposals
-
+        
+        #encoder_layer,decoder_layer들이 하나의 레이어를 의미
+        
         encoder_layer = DeformableTransformerEncoderLayer(d_model, dim_feedforward,
                                                           dropout, activation,
                                                           num_feature_levels, nhead, enc_n_points)
@@ -38,10 +40,10 @@ class DeformableTransformer(nn.Module):
         self.level_embed = nn.Parameter(torch.Tensor(num_feature_levels, d_model))
 
         if two_stage:
-            self.enc_output = nn.Linear(d_model, d_model)
-            self.enc_output_norm = nn.LayerNorm(d_model)
-            self.pos_trans = nn.Linear(d_model * 2, d_model * 2)
-            self.pos_trans_norm = nn.LayerNorm(d_model * 2)
+            self.enc_output = nn.Linear(d_model, d_model) #256,256
+            self.enc_output_norm = nn.LayerNorm(d_model) #LayerNorm을 적용하면서 차원을 줄여줌
+            self.pos_trans = nn.Linear(d_model * 2, d_model * 2) 
+            self.pos_trans_norm = nn.LayerNorm(d_model * 2) #여기서 왜 차원이 늘어나지? 차원이 어떻게 변하는지 봐야함.
         else:
             self.reference_points = nn.Linear(d_model, 2)
 
@@ -64,7 +66,7 @@ class DeformableTransformer(nn.Module):
         c3 = memory[:,level_start_index[0]:level_start_index[1],:]
         s3 = c3.shape
         c3 = c3.reshape([s3[0],spatial_shapes[0][0],spatial_shapes[0][1],s3[2]])
-        
+        #여기서 c3,c4,c5의 각 shape을 확인해보자
         c4 = memory[:,level_start_index[1]:level_start_index[2],:]
         s4 = c4.shape
         c4 = c4.reshape([s4[0],spatial_shapes[1][0],spatial_shapes[1][1],s4[2]])
@@ -72,7 +74,7 @@ class DeformableTransformer(nn.Module):
         c5 = memory[:,level_start_index[2]:level_start_index[3],:]
         s5 = c5.shape
         c5 = c5.reshape([s5[0],spatial_shapes[2][0],spatial_shapes[2][1],s5[2]])
-    
+    #각 레벨의 feature map을 가져옴
         import numpy as np
         import cv2
         import matplotlib.pyplot as plt
@@ -96,7 +98,7 @@ class DeformableTransformer(nn.Module):
         plt.close()
 
     def get_proposal_pos_embed(self, proposals):
-        num_pos_feats = 128
+        num_pos_feats = 128 
         temperature = 10000
         scale = 2 * math.pi
 
@@ -159,13 +161,18 @@ class DeformableTransformer(nn.Module):
         mask_flatten = []
         lvl_pos_embed_flatten = []
         spatial_shapes = []
+        #각 층별로 나오겠지 lvl확인해보기.
         for lvl, (src, mask, pos_embed) in enumerate(zip(srcs, masks, pos_embeds)):
-            bs, c, h, w = src.shape
-            spatial_shape = (h, w)
-            spatial_shapes.append(spatial_shape)
+            bs, c, h, w = src.shape 
+            #src.shape = [3,256,50,52]
+            spatial_shape = (h, w) 
+            spatial_shapes.append(spatial_shape) 
+            #flatten->[3, 256, 2600] transpose->[3, 2600, 256]
+            
             src = src.flatten(2).transpose(1, 2)
-            mask = mask.flatten(1)
-            pos_embed = pos_embed.flatten(2).transpose(1, 2)
+            #src.shape = [3,10300,256]
+            mask = mask.flatten(1) #pos_embed.flatten(2) 보기.
+            pos_embed = pos_embed.flatten(2).transpose(1, 2) #transpose(1,2)는 1번째와 2번째 차원을 바꾸는 것(?)
             lvl_pos_embed = pos_embed + self.level_embed[lvl].view(1, 1, -1)
             lvl_pos_embed_flatten.append(lvl_pos_embed)
             src_flatten.append(src)
@@ -176,14 +183,18 @@ class DeformableTransformer(nn.Module):
         spatial_shapes = torch.as_tensor(spatial_shapes, dtype=torch.long, device=src_flatten.device)
         level_start_index = torch.cat((spatial_shapes.new_zeros((1, )), spatial_shapes.prod(1).cumsum(0)[:-1]))
         valid_ratios = torch.stack([self.get_valid_ratio(m) for m in masks], 1)
+#src_flatten [3, 13719, 256]
+#spatial_shapes[[100, 103],[ 50,  52],[ 25,  26],[ 13,  13]]
+#level_start_index  [0, 10300, 12900, 13550] flatten된 src의 시작 index
+#valid_ratios 배치크기가 3이라 3개의 차원나오고 [0.8447, 0.7200],[0.8462, 0.7200],[0.8462, 0.7200],[0.8462, 0.7692]
+#특징맵은 4개니깐 
 
-     
-        # encoder
+        # encoder outputs
         memory = self.encoder(src_flatten, spatial_shapes, level_start_index, valid_ratios, lvl_pos_embed_flatten, mask_flatten)
 
       
         # prepare input for decoder
-        bs, _, c = memory.shape
+        bs, _, c = memory.shape #memory의 shape을 확인해보자
         if self.two_stage:
             output_memory, output_proposals = self.gen_encoder_output_proposals(memory, mask_flatten, spatial_shapes)
         
@@ -192,7 +203,7 @@ class DeformableTransformer(nn.Module):
             enc_outputs_obj = self.decoder.object_head[self.decoder.num_layers](output_memory)
           
             enc_outputs_coord_unact = self.decoder.bbox_embed[self.decoder.num_layers](output_memory) + output_proposals
-
+#enc_output들 확인해보기.
             topk = self.two_stage_num_proposals
             
             
@@ -412,7 +423,7 @@ def _get_activation_fn(activation):
     raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
 
 
-def build_deforamble_transformer(args):
+def build_deforamble_transformer(args): #args에서 필요한 인자들을 받아서 DeformableTransformer를 생성
     return DeformableTransformer(
         d_model=args.hidden_dim,
         nhead=args.nheads,
